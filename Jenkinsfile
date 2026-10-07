@@ -1,4 +1,3 @@
-```groovy
 pipeline {
     agent {
         label 'build-agent'
@@ -231,4 +230,3 @@ pipeline {
         }
     }
 }
-```

@@ -1,4 +1,3 @@
-```groovy
 pipeline {
     agent {
         label 'build-agent'
@@ -286,4 +285,3 @@ EOF
         }
     }
 }
-```

@@ -2,7 +2,7 @@ package org.ips.xml.signer.xmlsigner.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.ips.xml.signer.xmlsigner.messages.OpenConnectResponse;
+
 import org.ips.xml.signer.xmlsigner.models.ServiceRequestHeader;
 import org.ips.xml.signer.xmlsigner.service.digestService.DigestService;
 import org.ips.xml.signer.xmlsigner.service.digestService.XMLDigestVerifier;
@@ -75,14 +75,6 @@ public class DigestController {
         return xml != null && xml.trim().startsWith("<?xml");
     }
 
-
-    @PostMapping("test-response")
-    public ResponseEntity<OpenConnectResponse> testResponse(){
-        ResponseEntity<OpenConnectResponse> openConnectResponse = OpenConnectResponse.error(" there is issue",
-               HttpStatus.UNAUTHORIZED );
-        return  openConnectResponse;
-
-    }
 
 }
 

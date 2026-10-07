@@ -43,7 +43,7 @@ public class JwtSigningUtils {
                 .withClaim("cert_iss", issuer)
                 .withClaim("cert_sn", String.valueOf(serialNumber))
                 .withExpiresAt(new Date(System.currentTimeMillis() + 5000L))
-                .withJWTId("11223312412321")
+                .withJWTId("11223312412321090909090")
                 .sign(algorithm);
         jwtInfo.setJwt(jwtToken);
         return jwtInfo;

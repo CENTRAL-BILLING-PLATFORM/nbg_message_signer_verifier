@@ -6,9 +6,8 @@ pipeline {
     environment {
         VERSION = "${BUILD_NUMBER}"
 
-        // IMPORTANT:
-        // Verify this path exists on the Jenkins build-agent.
-        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk'
+        // Java 17 - must exist on the Jenkins build agent
+        JAVA_HOME = '/usr/lib/jvm/java-17-openjdk'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
 
         DEPLOYMENT_FILE_DIR = './deployment'
@@ -103,27 +102,32 @@ pipeline {
 
                     echo ""
                     echo "=========================================="
-                    echo "VALIDATING JAVA 21"
+                    echo "VALIDATING JAVA 17"
                     echo "=========================================="
 
                     JAVA_MAJOR=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d. -f1)
 
-                    if [ "$JAVA_MAJOR" != "21" ]; then
-                        echo "ERROR: Jenkins agent is NOT running Java 21."
+                    if [ "$JAVA_MAJOR" != "17" ]; then
+                        echo "ERROR: Jenkins agent is NOT running Java 17."
                         echo "Detected Java version: $JAVA_MAJOR"
                         echo "JAVA_HOME: $JAVA_HOME"
                         echo "Java executable: $(readlink -f "$(which java)")"
                         exit 1
                     fi
 
-                    echo "SUCCESS: Java 21 detected."
+                    echo "SUCCESS: Java 17 detected."
+
+                    echo ""
+                    echo "=========================================="
+                    echo "BUILD ENVIRONMENT VALIDATION PASSED"
+                    echo "=========================================="
                 '''
             }
         }
 
         stage('Build War File') {
             steps {
-                echo 'Building Spring Boot WAR with Gradle...'
+                echo 'Building Spring Boot WAR with Java 17 and Gradle...'
 
                 sh '''
                     set -e
@@ -227,8 +231,8 @@ pipeline {
                     buildStatus == 'FAILURE' ? 'danger' : 'warning'
 
                 /*
-                 * Do not interpolate SLACK_WEBHOOK directly into the Groovy
-                 * string. This avoids the Jenkins secret interpolation warning.
+                 * Use Jenkins credentials binding to avoid exposing
+                 * the Slack webhook through Groovy interpolation.
                  */
                 withCredentials([
                     string(

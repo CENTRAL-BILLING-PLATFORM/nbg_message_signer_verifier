@@ -9,8 +9,8 @@ import org.ips.xml.signer.xmlsigner.service.apiClient.TokenGenerationClientServi
 import org.ips.xml.signer.xmlsigner.service.token.TokenCacheService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 
+import org.springframework.stereotype.Service;
 import java.util.Optional;
 
 @Service
@@ -75,7 +75,7 @@ public class TokenGenerationManager {
 
     public TokenResponse getToken(String clientBic ) throws Exception {
         TokenInfo token = cacheService.getToken(clientBic);
-        Long CURRENT_TIME_SECONDS = Math.divideExact(System.currentTimeMillis(),1000);
+
         if (token != null && token.getExpires_in() > TOLERANCE_MILLIS) {
             return new TokenResponse(token.getAccess_token());
         }

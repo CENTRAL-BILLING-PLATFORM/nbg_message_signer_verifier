@@ -13,7 +13,7 @@ pipeline {
         DEPLOYMENT_FILE_DIR = './deployment'
         IMAGE_FULL_ADDR = 'registry.ethswitch.et:8443/nbg/nbg-xml-signer-uat'
 
-        MANIFEST_URL = 'github.com/ethswitch/nbg-xml-signer-manifests.git'
+        MANIFEST_URL = 'github.com/CENTRAL-BILLING-PLATFORM/nbg-message-signer-verifier-manifests.git'
         TARGET_BRANCH = 'UAT'
         DEPLOYMENT_FILE = 'deployment.yaml'
         REPOSITORY_URL = "https://${MANIFEST_URL}"

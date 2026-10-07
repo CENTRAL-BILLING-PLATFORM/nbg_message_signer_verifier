@@ -1,24 +1,29 @@
+```groovy
 pipeline {
     agent {
         label 'build-agent'
     }
 
     environment {
-        VERSION = "${BUILD_NUMBER}" // Tag image with build number only
+        // Java 21 - MUST exist on the build-agent
+        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk'
+        PATH = "${JAVA_HOME}/bin:${env.PATH}"
+
+        VERSION = "${BUILD_NUMBER}"
         DEPLOYMENT_FILE_DIR = './deployment'
         IMAGE_FULL_ADDR = 'registry.ethswitch.et:8443/nbg/nbg-xml-signer-uat'
         MANIFEST_URL = 'github.com/ethswitch/nbg-xml-signer-manifests.git'
         TARGET_BRANCH = 'UAT'
         DEPLOYMENT_FILE = 'deployment.yaml'
         REPOSITORY_URL = "https://${MANIFEST_URL}"
-        SLACK_WEBHOOK = credentials('slack-webhook') // Jenkins secret text credential
+        SLACK_WEBHOOK = credentials('slack-webhook')
     }
 
     stages {
+
         stage('Prepare Environment') {
             steps {
                 script {
-                    // Get Git commit metadata
                     env.COMMITTER_NAME = sh(
                         script: """
                             git config --global --add safe.directory ${env.WORKSPACE}
@@ -35,6 +40,7 @@ pipeline {
                     def BRANCH_NAME = env.JOB_NAME.tokenize('/')[-1]
                     def JOBNAME = env.JOB_NAME.tokenize('/')[1]
                     def J_NAME = "${JOBNAME}-${BRANCH_NAME}:${env.VERSION}"
+
                     env.J_NAME = J_NAME
                     env.IMAGE_TAG = env.VERSION
                     env.IMAGE_REPO = env.IMAGE_FULL_ADDR
@@ -42,38 +48,81 @@ pipeline {
                     echo "Job Name: ${J_NAME}"
                     echo "Branch: ${BRANCH_NAME}"
                     echo "Committer: ${COMMITTER_NAME}"
+                    echo "Commit Message: ${COMMIT_MESSAGE}"
                 }
+            }
+        }
+
+        stage('Verify Build Environment') {
+            steps {
+                sh '''
+                    set -e
+
+                    echo "=========================================="
+                    echo "BUILD ENVIRONMENT"
+                    echo "=========================================="
+
+                    echo "JAVA_HOME=$JAVA_HOME"
+                    echo "PATH=$PATH"
+
+                    echo "Java:"
+                    java -version
+
+                    echo "Javac:"
+                    javac -version
+
+                    echo "Gradle:"
+                    ./gradlew --version
+
+                    echo "Gradle Java Toolchains:"
+                    ./gradlew javaToolchains
+
+                    echo "=========================================="
+                '''
             }
         }
 
         stage('Build War File') {
             steps {
-                echo 'Building Spring Boot JAR with Gradle...'
-                sh 'chmod +x gradlew'
-                // sh './gradlew wrapper'
-                sh './gradlew dependencies --no-daemon || true'
-                // sh './gradlew spotlessApply clean  build -x test  --no-daemon'
-                sh './gradlew build -x test'
+                echo 'Building Spring Boot WAR with Gradle and Java 21...'
 
+                sh '''
+                    set -e
+
+                    chmod +x gradlew
+
+                    ./gradlew clean build -x test --no-daemon
+                '''
             }
         }
 
         stage('Build and Push Docker Image') {
             steps {
                 script {
-                    echo "Building Docker image on Jenkins VM agent..."
+                    echo "Building Docker image on Jenkins build agent..."
 
                     def imageTag = "${IMAGE_FULL_ADDR}:${IMAGE_TAG}"
+
                     echo "Building image: ${imageTag}"
 
-                    // Build Docker image
-                    def appImage = docker.build(imageTag, "--build-arg J_NAME=${J_NAME} .")
+                    def appImage = docker.build(
+                        imageTag,
+                        "--build-arg J_NAME=${J_NAME} ."
+                    )
 
                     echo "Pushing Docker image to Harbor registry: ${imageTag}"
 
-                    // Push only build-number-tagged image
-                    withCredentials([usernamePassword(credentialsId: 'jenkins-build', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASS')]) {
-                        docker.withRegistry("https://${IMAGE_FULL_ADDR.split('/')[0]}", 'jenkins-build') {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'jenkins-build',
+                            usernameVariable: 'HARBOR_USER',
+                            passwordVariable: 'HARBOR_PASS'
+                        )
+                    ]) {
+                        docker.withRegistry(
+                            "https://${IMAGE_FULL_ADDR.split('/')[0]}",
+                            'jenkins-build'
+                        ) {
                             appImage.push()
                         }
                     }
@@ -82,24 +131,56 @@ pipeline {
                 }
             }
         }
-       stage('Trigger ManifestUpdate') {
-           steps {
-               echo "triggering updatemanifestjob"
-               build job: 'manifest-updater', parameters: [string(name: 'IMAGE_TAG', value: "${VERSION}"), string(name: 'MANIFEST_URL', value: "${MANIFEST_URL}"), string(name: 'DEPLOYMENT_FILE_DIR', value: "${DEPLOYMENT_FILE_DIR}"), string(name: 'TARGET_BRANCH', value: "${TARGET_BRANCH}"), string(name: 'IMAGE_FULL_ADDR', value: "${IMAGE_FULL_ADDR}"), string(name: 'REPOSITORY_URL', value: "${REPOSITORY_URL}")]
-           }
 
-       }
+        stage('Trigger ManifestUpdate') {
+            steps {
+                echo "Triggering manifest-updater job..."
 
+                build job: 'manifest-updater',
+                    parameters: [
+                        string(
+                            name: 'IMAGE_TAG',
+                            value: "${VERSION}"
+                        ),
+                        string(
+                            name: 'MANIFEST_URL',
+                            value: "${MANIFEST_URL}"
+                        ),
+                        string(
+                            name: 'DEPLOYMENT_FILE_DIR',
+                            value: "${DEPLOYMENT_FILE_DIR}"
+                        ),
+                        string(
+                            name: 'TARGET_BRANCH',
+                            value: "${TARGET_BRANCH}"
+                        ),
+                        string(
+                            name: 'IMAGE_FULL_ADDR',
+                            value: "${IMAGE_FULL_ADDR}"
+                        ),
+                        string(
+                            name: 'REPOSITORY_URL',
+                            value: "${REPOSITORY_URL}"
+                        )
+                    ]
+            }
+        }
     }
 
     post {
         always {
             script {
                 def buildStatus = currentBuild.currentResult ?: 'SUCCESS'
-                def statusEmoji = buildStatus == 'SUCCESS' ? '✅' :
-                                  buildStatus == 'FAILURE' ? '❌' : '⚠️'
-                def themeColor = buildStatus == 'SUCCESS' ? 'good' :
-                                 buildStatus == 'FAILURE' ? 'danger' : 'warning'
+
+                def statusEmoji =
+                    buildStatus == 'SUCCESS' ? '✅' :
+                    buildStatus == 'FAILURE' ? '❌' :
+                    '⚠️'
+
+                def themeColor =
+                    buildStatus == 'SUCCESS' ? 'good' :
+                    buildStatus == 'FAILURE' ? 'danger' :
+                    'warning'
 
                 def payload = """
                 {
@@ -108,20 +189,40 @@ pipeline {
                         {
                             "color": "${themeColor}",
                             "fields": [
-                                { "title": "Image", "value": "${env.IMAGE_REPO}", "short": false },
-                                { "title": "Tag", "value": "${env.IMAGE_TAG}", "short": true },
-                                { "title": "Committer", "value": "${env.COMMITTER_NAME}", "short": true },
-                                { "title": "Message", "value": "${env.COMMIT_MESSAGE}", "short": false }
+                                {
+                                    "title": "Image",
+                                    "value": "${env.IMAGE_REPO}",
+                                    "short": false
+                                },
+                                {
+                                    "title": "Tag",
+                                    "value": "${env.IMAGE_TAG}",
+                                    "short": true
+                                },
+                                {
+                                    "title": "Committer",
+                                    "value": "${env.COMMITTER_NAME}",
+                                    "short": true
+                                },
+                                {
+                                    "title": "Message",
+                                    "value": "${env.COMMIT_MESSAGE}",
+                                    "short": false
+                                }
                             ]
                         }
                     ]
                 }
                 """
 
-                // Notify Slack
                 sh(
                     label: 'Notify Slack',
-                    script: """curl -s -X POST -H 'Content-type: application/json' -d '${payload}' ${SLACK_WEBHOOK}"""
+                    script: """#!/bin/bash
+                        curl -s -X POST \
+                        -H 'Content-type: application/json' \
+                        -d '${payload}' \
+                        '${SLACK_WEBHOOK}'
+                    """
                 )
 
                 echo "Cleaning up workspace..."
@@ -130,3 +231,4 @@ pipeline {
         }
     }
 }
+```

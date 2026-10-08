@@ -32,8 +32,7 @@ public class TokenGenerationClientService {
     private URI AUTH_SERVER_TOKEN_URI;
 
     @Autowired
-    public TokenGenerationClientService(RestTemplate restTemplate,
-                                        RetryExecutorService retryExecutorService) {
+    public TokenGenerationClientService(RestTemplate restTemplate, RetryExecutorService retryExecutorService) {
         this.restTemplate = restTemplate;
         this.retryExecutorService = retryExecutorService;
     }
@@ -61,6 +60,12 @@ public class TokenGenerationClientService {
         requestBody.add("password", credentialInfo.getPassword());
         requestBody.add("grant_type", credentialInfo.getGrantType());
 
+        logger.info(" trying to generate token with jwt-assertion of {}", credentialInfo.getJwt());
+
+        logger.info(" trying to generate token with inof {}, {}, {}", credentialInfo.getUserName(),
+
+                credentialInfo.getPassword(), credentialInfo.getGrantType());
+        logger.info(" trying to generate token with url for token {}", credentialInfo.getTokenGenerationPath());
         HttpEntity<MultiValueMap<String, String>> httpEntity = new HttpEntity<>(requestBody, requestHeaders);
 
         // Retryable block for token generation
@@ -77,7 +82,6 @@ public class TokenGenerationClientService {
     }
 
 
-
     public TokenInfo refreshToken(Participant credentialInfo, String refreshToken) throws Exception {
         logger.info("Attempting to refresh token for participant: {}", credentialInfo.getBic());
         create(credentialInfo.getTokenGenerationPath());
@@ -92,7 +96,7 @@ public class TokenGenerationClientService {
 // Retryable block for token generation
         return retryExecutorService.executeWithRetry(context -> {
             logger.info("trying to refresh token");
-            ResponseEntity<TokenInfo>  response = restTemplate.postForEntity(AUTH_SERVER_TOKEN_URI, httpEntity, TokenInfo.class);
+            ResponseEntity<TokenInfo> response = restTemplate.postForEntity(AUTH_SERVER_TOKEN_URI, httpEntity, TokenInfo.class);
 
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
                 throw new IllegalStateException("Token generation failed with status: " + response.getStatusCode());

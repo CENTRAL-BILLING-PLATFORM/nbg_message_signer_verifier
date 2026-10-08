@@ -21,9 +21,9 @@ ips:
   participants:
     -   bic: ENBGETAA
         grantType: password
-        password: nbg
+        password:  ${ETS_IPS_PASSWORD}
         refreshGrantType: refresh_token
-        userName: nbg
+        userName: ${ETS_IPS_USERNAME}
 logging:
   level:
     org:

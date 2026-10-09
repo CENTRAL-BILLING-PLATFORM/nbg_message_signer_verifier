@@ -6,6 +6,7 @@ import org.ips.xml.signer.xmlsigner.service.RetryExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.*;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
@@ -32,7 +33,10 @@ public class TokenGenerationClientService {
     private URI AUTH_SERVER_TOKEN_URI;
 
     @Autowired
-    public TokenGenerationClientService(RestTemplate restTemplate, RetryExecutorService retryExecutorService) {
+    public TokenGenerationClientService(
+            @Qualifier("insecureRestTemplate")
+            RestTemplate restTemplate,
+                                        RetryExecutorService retryExecutorService) {
         this.restTemplate = restTemplate;
         this.retryExecutorService = retryExecutorService;
     }
